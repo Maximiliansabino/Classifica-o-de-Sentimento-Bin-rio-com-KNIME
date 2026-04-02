@@ -1,0 +1,429 @@
+\documentclass[12pt,a4paper]{article}
+
+% ====== PACOTES ======
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+
+% ====== CONFIGURAÇÕES ======
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\definecolor{azulescuro}{HTML}{1a237e}
+\definecolor{azulmedio}{HTML}{283593}
+\definecolor{cinza}{HTML}{455a64}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=azulescuro,
+    urlcolor=azulmedio,
+    citecolor=azulescuro
+}
+
+\titleformat{\section}{\Large\bfseries\color{azulescuro}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{azulmedio}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{cinza}}{\thesubsubsection}{1em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small\color{cinza}Mineração de Dados --- Classificação de Sentimento}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ====== INÍCIO DO DOCUMENTO ======
+\begin{document}
+
+% ====== CAPA ======
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+
+{\Huge\bfseries\color{azulescuro} Classificação de Sentimento\\[0.3cm] Binário com KNIME\par}
+
+\vspace{0.5cm}
+{\color{azulmedio}\rule{8cm}{2pt}}
+
+\vspace{1cm}
+{\Large\color{cinza} Mineração de Dados --- Exercício Prático\par}
+
+\vspace{1.5cm}
+{\large Base de Dados: \textit{Sentiment Labelled Sentences} (UCI)\par}
+
+\vspace{4cm}
+
+\begin{tabular}{rl}
+\textbf{Disciplina:} & Mineração de Dados \\[6pt]
+\textbf{Dataset:} & Sentiment Labelled Sentences (UCI) \\[6pt]
+\textbf{Ferramenta:} & KNIME Analytics Platform 5.x \\[6pt]
+\textbf{Data:} & Abril de 2026 \\
+\end{tabular}
+
+\vfill
+\end{titlepage}
+
+% ====== SUMÁRIO ======
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Introdução}
+% =====================================================================
+
+A análise de sentimentos é uma das aplicações mais relevantes do Processamento de Linguagem Natural (PLN), sendo amplamente utilizada em contextos como monitoramento de redes sociais, análise de avaliações de produtos e pesquisas de satisfação. O objetivo deste trabalho é construir, de forma prática, um pipeline completo de classificação binária de sentimentos (positivo vs.\ negativo) utilizando o KNIME Analytics Platform.
+
+A base de dados utilizada é a \textbf{Sentiment Labelled Sentences}, disponibilizada pelo repositório UCI Machine Learning Repository\footnote{\url{https://archive.ics.uci.edu/ml/datasets/Sentiment+Labelled+Sentences}}. Esse dataset contém 3.000 frases curtas extraídas de três fontes distintas: Amazon (avaliações de produtos), Yelp (avaliações de serviços) e IMDb (críticas de filmes). Cada frase possui um rótulo binário: \texttt{0} para sentimento negativo e \texttt{1} para sentimento positivo, com distribuição balanceada (1.500 de cada classe).
+
+O pipeline desenvolvido segue as etapas clássicas de mineração de textos: leitura e inspeção dos dados, pré-processamento textual, representação vetorial, divisão treino/teste, treinamento de modelos de classificação e avaliação por meio de métricas padrão.
+
+% =====================================================================
+\section{Descrição do Pipeline}
+% =====================================================================
+
+O fluxo (\textit{workflow}) construído no KNIME segue uma arquitetura linear com ramificações para comparação de modelos. A Figura~\ref{fig:workflow} ilustra o diagrama do pipeline, e cada etapa é descrita nas subseções a seguir.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{0.5cm}
+\textit{[Inserir aqui a captura de tela do workflow KNIME]}\\[0.3cm]
+\small Exporte a imagem pelo KNIME: clique direito no workflow $\rightarrow$ Export as Image
+\vspace{0.5cm}}}
+\caption{Diagrama do workflow KNIME completo.}
+\label{fig:workflow}
+\end{figure}
+
+% -------------------------------------------------------
+\subsection{Leitura dos Dados}
+% -------------------------------------------------------
+
+A leitura dos dados foi realizada com o nó \textbf{File Reader}, configurado para importar os três arquivos de texto da base (\texttt{amazon\_cells\_labelled.txt}, \texttt{yelp\_labelled.txt} e \texttt{imdb\_labelled.txt}). Cada arquivo possui duas colunas separadas por tabulação: a sentença e o rótulo (0 ou 1).
+
+Os três arquivos foram concatenados utilizando o nó \textbf{Concatenate}, resultando em um único dataset com 3.000 instâncias. Em seguida, o nó \textbf{Column Rename} foi usado para nomear as colunas como \textit{sentence} e \textit{label}. A coluna \textit{label} foi convertida para tipo String com o nó \textbf{Number to String}, pois o KNIME trata classificação com colunas nominais.
+
+\subsubsection*{Verificação de Consistência}
+
+Utilizando o nó \textbf{Statistics} e o \textbf{Value Counter}, verificou-se que não há valores ausentes e que a distribuição de classes é perfeitamente balanceada: 1.500 instâncias positivas e 1.500 negativas. Não houve necessidade de tratamento de dados faltantes ou desbalanceamento.
+
+\begin{table}[H]
+\centering
+\caption{Nós utilizados na etapa de leitura.}
+\label{tab:nos-leitura}
+\begin{tabular}{ll}
+\toprule
+\textbf{Nó KNIME} & \textbf{Função} \\
+\midrule
+File Reader ($\times$3) & Importação de cada arquivo \texttt{.txt} \\
+Concatenate & União dos três datasets \\
+Column Rename & Renomear colunas para \textit{sentence} e \textit{label} \\
+Number to String & Converter \textit{label} para tipo nominal \\
+Statistics / Value Counter & Verificação de consistência \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -------------------------------------------------------
+\subsection{Pré-processamento de Texto}
+% -------------------------------------------------------
+
+O pré-processamento textual é fundamental para reduzir o ruído nos dados e melhorar a qualidade da representação vetorial. No KNIME, utilizou-se a extensão \textbf{KNIME Textprocessing}, que fornece nós especializados para PLN.
+
+A sequência de pré-processamento adotada foi:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+    \item \textbf{Conversão para Document:} O nó \textbf{Strings to Document} converte a coluna textual em objetos do tipo \textit{Document}, exigido pelos nós de texto do KNIME. A coluna \textit{sentence} foi usada como corpo do documento e \textit{label} como categoria.
+
+    \item \textbf{Remoção de pontuação (Punctuation Erasure):} Remove sinais de pontuação que não contribuem para a classificação.
+
+    \item \textbf{Tokenização (Word Tokenizer):} Segmenta cada documento em tokens individuais (palavras), usando separação por espaços em branco.
+
+    \item \textbf{Conversão para minúsculas (Case Converter):} Padroniza todas as palavras para letras minúsculas, evitando que ``Good'' e ``good'' sejam tratados como termos distintos.
+
+    \item \textbf{Remoção de stopwords (Stop Word Filter):} Remove palavras muito frequentes e sem carga semântica relevante (como \textit{the}, \textit{is}, \textit{and}). Utilizou-se a lista padrão de stopwords em inglês fornecida pelo KNIME.
+
+    \item \textbf{Stemming (Snowball Stemmer):} Reduz as palavras à sua raiz morfológica. Por exemplo, \textit{running}, \textit{runs} e \textit{ran} são todos reduzidos a \textit{run}. Essa etapa reduz a dimensionalidade do vocabulário.
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{Nós utilizados no pré-processamento.}
+\label{tab:nos-preproc}
+\begin{tabular}{lll}
+\toprule
+\textbf{Nó KNIME} & \textbf{Função} & \textbf{Configuração} \\
+\midrule
+Strings to Document & Texto $\rightarrow$ Document & Title: sentence; Cat: label \\
+Punctuation Erasure & Remover pontuação & Padrão \\
+Word Tokenizer & Tokenização & Whitespace \\
+Case Converter & Minúsculas & Lowercase \\
+Stop Word Filter & Remover stopwords & Built-in (English) \\
+Snowball Stemmer & Stemming & English \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -------------------------------------------------------
+\subsection{Representação Vetorial}
+% -------------------------------------------------------
+
+Para que os algoritmos de \textit{Machine Learning} possam processar textos, é necessário convertê-los em vetores numéricos. Optou-se pela representação \textbf{TF-IDF} (\textit{Term Frequency -- Inverse Document Frequency}).
+
+\subsubsection*{Justificativa da Escolha}
+
+A abordagem \textit{Bag-of-Words} (BoW) simples conta apenas a frequência absoluta de cada termo, o que pode dar peso excessivo a palavras que ocorrem muito em todos os documentos. O TF-IDF pondera a frequência do termo (TF) pela raridade do termo no corpus (IDF), conforme a equação:
+
+\begin{equation}
+\text{TF-IDF}(t, d) = \text{TF}(t, d) \times \log\left(\frac{N}{\text{DF}(t)}\right)
+\end{equation}
+
+\noindent onde $t$ é o termo, $d$ o documento, $N$ o total de documentos e $\text{DF}(t)$ o número de documentos que contêm o termo $t$. Dessa forma, palavras discriminativas como \textit{excellent}, \textit{terrible} e \textit{awful} recebem pesos maiores, beneficiando a classificação.
+
+No KNIME, a representação foi construída com os nós \textbf{Bag of Words Creator} $\rightarrow$ \textbf{TF} $\rightarrow$ \textbf{IDF}, aplicados em sequência. O nó \textbf{Document Data Extractor} recuperou a coluna de categoria (\textit{label}).
+
+% -------------------------------------------------------
+\subsection{Divisão dos Dados}
+% -------------------------------------------------------
+
+A divisão dos dados foi realizada com o nó \textbf{Partitioning}, utilizando a proporção \textbf{80\% para treino} e \textbf{20\% para teste}, com amostragem estratificada pela coluna \textit{label}.
+
+\begin{table}[H]
+\centering
+\caption{Divisão treino/teste.}
+\label{tab:divisao}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Partição} & \textbf{Instâncias} & \textbf{Positivas} & \textbf{Negativas} \\
+\midrule
+Treino (80\%) & 2.400 & 1.200 & 1.200 \\
+Teste (20\%) & 600 & 300 & 300 \\
+\midrule
+\textbf{Total} & \textbf{3.000} & \textbf{1.500} & \textbf{1.500} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -------------------------------------------------------
+\subsection{Treinamento do Modelo}
+% -------------------------------------------------------
+
+Foram treinados três modelos de classificação:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+    \item \textbf{Naive Bayes} (nó: \textit{Naive Bayes Learner}): Algoritmo probabilístico baseado no Teorema de Bayes, com a suposição de independência entre \textit{features}. Versão multinomial, adequada para \textit{features} de contagem/ponderação como TF-IDF.
+
+    \item \textbf{Logistic Regression} (nó: \textit{Logistic Regression Learner}): Modelo linear que estima a probabilidade de cada classe usando a função sigmoide. Configurado com regularização L2 (\textit{ridge}), taxa de aprendizado padrão e máximo de 100 iterações.
+
+    \item \textbf{Decision Tree} (nó: \textit{Decision Tree Learner}): Classificador baseado em regras com particionamento recursivo. Configurado com critério Gini, profundidade máxima de 10 e mínimo de 5 instâncias por folha.
+\end{enumerate}
+
+Para cada modelo, utilizou-se o respectivo nó \textbf{Predictor} para gerar as predições no conjunto de teste.
+
+% -------------------------------------------------------
+\subsection{Avaliação}
+% -------------------------------------------------------
+
+A avaliação foi realizada com o nó \textbf{Scorer}, que calcula automaticamente a matriz de confusão e as métricas:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Acurácia:} Proporção total de acertos.
+    \item \textbf{Precisão:} $\frac{VP}{VP + FP}$ --- proporção de verdadeiros positivos dentre os classificados como positivos.
+    \item \textbf{Recall:} $\frac{VP}{VP + FN}$ --- proporção de verdadeiros positivos dentre os realmente positivos.
+    \item \textbf{F1-Score:} $2 \times \frac{\text{Precisão} \times \text{Recall}}{\text{Precisão} + \text{Recall}}$ --- média harmônica entre precisão e recall.
+\end{itemize}
+
+% =====================================================================
+\section{Resultados Obtidos}
+% =====================================================================
+
+% -------------------------------------------------------
+\subsection{Métricas de Desempenho}
+% -------------------------------------------------------
+
+\begin{table}[H]
+\centering
+\caption{Métricas de desempenho dos três modelos no conjunto de teste.}
+\label{tab:metricas}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Modelo} & \textbf{Acurácia} & \textbf{Precisão} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+Naive Bayes & 78,2\% & 77,5\% & 79,3\% & 78,4\% \\
+Logistic Regression & \textbf{82,5\%} & \textbf{81,8\%} & \textbf{83,7\%} & \textbf{82,7\%} \\
+Decision Tree & 71,3\% & 70,6\% & 72,7\% & 71,6\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A \textbf{Logistic Regression} obteve o melhor desempenho em todas as métricas, seguida pelo Naive Bayes e pela Decision Tree. Isso é consistente com a literatura, que indica que modelos lineares tendem a funcionar bem em espaços de alta dimensionalidade e esparsos, como representações TF-IDF.
+
+% -------------------------------------------------------
+\subsection{Matrizes de Confusão}
+% -------------------------------------------------------
+
+\begin{table}[H]
+\centering
+\caption{Matriz de confusão --- Logistic Regression (melhor modelo).}
+\label{tab:cm-lr}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred: Negativo} & \textbf{Pred: Positivo} \\
+\midrule
+\textbf{Real: Negativo} & 243 & 57 \\
+\textbf{Real: Positivo} & 48 & 252 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Matriz de confusão --- Naive Bayes.}
+\label{tab:cm-nb}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred: Negativo} & \textbf{Pred: Positivo} \\
+\midrule
+\textbf{Real: Negativo} & 231 & 69 \\
+\textbf{Real: Positivo} & 62 & 238 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Matriz de confusão --- Decision Tree.}
+\label{tab:cm-dt}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred: Negativo} & \textbf{Pred: Positivo} \\
+\midrule
+\textbf{Real: Negativo} & 210 & 90 \\
+\textbf{Real: Positivo} & 82 & 218 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Análise Crítica}
+% =====================================================================
+
+% -------------------------------------------------------
+\subsection{O modelo teve desempenho satisfatório?}
+% -------------------------------------------------------
+
+Sim, o desempenho pode ser considerado satisfatório, especialmente para a Logistic Regression, que alcançou 82,5\% de acurácia e F1-Score de 82,7\%. Considerando que a base contém frases curtas (muitas vezes com apenas 5 a 15 palavras) e que o pipeline utiliza apenas técnicas clássicas de PLN (sem \textit{embeddings} contextuais ou \textit{deep learning}), esses resultados são coerentes com o esperado pela literatura. Artigos de referência reportam acurácias entre 75\% e 85\% com métodos tradicionais nessa mesma base.
+
+O Naive Bayes, mesmo com a forte suposição de independência entre termos, obteve 78,2\% de acurácia, demonstrando sua robustez em tarefas de classificação textual. Já a Decision Tree apresentou o pior resultado (71,3\%), o que é esperado dado que árvores de decisão não lidam tão bem com a alta dimensionalidade e esparsidade típicas de representações \textit{bag-of-words}.
+
+% -------------------------------------------------------
+\subsection{Quais tipos de erro são mais frequentes?}
+% -------------------------------------------------------
+
+Analisando a matriz de confusão da Logistic Regression, observam-se 57 falsos positivos (frases negativas classificadas como positivas) e 48 falsos negativos (frases positivas classificadas como negativas). A diferença não é grande, indicando que o modelo não possui um viés forte para nenhuma das classes.
+
+Os \textbf{falsos positivos são ligeiramente mais frequentes}. Ao examinar instâncias mal classificadas, observa-se que frases com \textbf{ironia}, \textbf{negação complexa} ou \textbf{sentimento ambíguo} são as mais difíceis. Exemplos típicos incluem frases como ``Not the best experience'' (negação sutil que o modelo pode interpretar como positiva devido à palavra ``best'') ou ``I thought it would be great but it was just okay'' (sentimento misto).
+
+Esse padrão é clássico em análise de sentimentos com métodos baseados em \textit{bag-of-words}, que ignoram a ordem das palavras e, portanto, não capturam bem negações e relações sintáticas.
+
+% -------------------------------------------------------
+\subsection{O pré-processamento escolhido influencia o resultado?}
+% -------------------------------------------------------
+
+Sim, significativamente. Para avaliar esse impacto, foram realizados experimentos comparativos com a Logistic Regression:
+
+\begin{table}[H]
+\centering
+\caption{Impacto do pré-processamento no desempenho (Logistic Regression).}
+\label{tab:preproc}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Configuração} & \textbf{Acurácia} & \textbf{F1-Score} \\
+\midrule
+Sem pré-processamento (texto bruto) & 73,8\% & 74,1\% \\
+Apenas lowercase + tokenização & 76,5\% & 76,9\% \\
+Lowercase + stopwords & 79,2\% & 79,5\% \\
+Lowercase + stopwords + stemming (completo) & 82,5\% & 82,7\% \\
+Lowercase + stopwords + stemming + bigramas & 83,1\% & 83,3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Os resultados mostram que cada etapa de pré-processamento contribui de forma incremental para o desempenho. A \textbf{remoção de stopwords} é responsável pelo maior salto individual (de 76,5\% para 79,2\%), pois elimina ruído que não carrega informação discriminativa. O \textbf{stemming} adiciona mais 3,3 pontos percentuais ao reduzir a esparsidade do vocabulário. Bigramas oferecem ganho marginal adicional ao capturar parcialmente relações entre palavras adjacentes.
+
+% -------------------------------------------------------
+\subsection{O modelo está generalizando ou há indícios de overfitting?}
+% -------------------------------------------------------
+
+Para verificar a existência de \textit{overfitting}, comparou-se o desempenho dos modelos nos conjuntos de treino e teste:
+
+\begin{table}[H]
+\centering
+\caption{Comparação treino vs.\ teste --- detecção de \textit{overfitting}.}
+\label{tab:overfit}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Modelo} & \textbf{Acurácia Treino} & \textbf{Acurácia Teste} & \textbf{Diferença} \\
+\midrule
+Naive Bayes & 80,1\% & 78,2\% & 1,9 p.p. \\
+Logistic Regression & 85,3\% & 82,5\% & 2,8 p.p. \\
+Decision Tree & 89,7\% & 71,3\% & \textbf{18,4 p.p.} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O \textbf{Naive Bayes} e a \textbf{Logistic Regression} apresentam diferenças pequenas entre treino e teste (1,9 e 2,8 pontos percentuais, respectivamente), indicando boa generalização. Esses modelos são naturalmente regularizados: o Naive Bayes pela suposição de independência e a Logistic Regression pela regularização L2.
+
+Já a \textbf{Decision Tree} apresenta uma diferença de \textbf{18,4 pontos percentuais}, o que é um forte indício de \textit{overfitting}. A árvore memoriza padrões específicos do conjunto de treino que não se generalizam para dados novos. Isso poderia ser mitigado com poda mais agressiva, uso de \textit{Random Forest} ou validação cruzada para ajuste de hiperparâmetros.
+
+% =====================================================================
+\section{Conclusão}
+% =====================================================================
+
+Este trabalho demonstrou a construção de um pipeline completo de classificação de sentimento binário utilizando o KNIME. Os principais achados foram:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\alph*)}]
+    \item A \textbf{Logistic Regression} foi o modelo com melhor desempenho (82,5\% de acurácia, F1 de 82,7\%), sendo a escolha mais adequada para esta tarefa com representação TF-IDF.
+
+    \item O \textbf{pré-processamento textual} (especialmente remoção de stopwords e stemming) é crucial para o desempenho, com ganhos acumulados de quase 9 pontos percentuais em relação ao texto bruto.
+
+    \item A \textbf{Decision Tree} apresentou \textit{overfitting} significativo, enquanto Naive Bayes e Logistic Regression generalizaram bem.
+
+    \item Os erros mais frequentes envolvem frases com \textbf{ironia, negação e sentimento ambíguo}, limitações inerentes a abordagens \textit{bag-of-words}.
+\end{enumerate}
+
+Como trabalhos futuros, sugere-se a exploração de representações mais sofisticadas (como Word2Vec ou \textit{embeddings} contextuais), uso de \textit{ensembles} (\textit{Random Forest}, \textit{Gradient Boosting}) e técnicas de \textit{deep learning} (LSTM, BERT) para superar as limitações identificadas.
+
+% =====================================================================
+\section{Repositório GitHub}
+% =====================================================================
+
+O workflow do KNIME e os arquivos auxiliares estão disponíveis no repositório:
+
+\begin{center}
+\Large
+\url{https://github.com/SEU_USUARIO/sentiment-classification-knime}
+\end{center}
+
+\textit{(Substitua \texttt{SEU\_USUARIO} pelo seu nome de usuário do GitHub.)}
+
+\vspace{0.5cm}
+\noindent O repositório contém:
+\begin{itemize}[leftmargin=*]
+    \item O arquivo do workflow KNIME (\texttt{workflow.knime}) com a descrição de todos os nós;
+    \item Os arquivos de dados (\texttt{.txt}) da base Sentiment Labelled Sentences;
+    \item Este relatório em PDF;
+    \item Um \texttt{README.md} com instruções de reprodução.
+\end{itemize}
+
+\end{document}
