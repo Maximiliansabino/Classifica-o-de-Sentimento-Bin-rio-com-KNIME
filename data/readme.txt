@@ -30,4 +30,4 @@ From Group to Individual Labels using Deep Features.
 KDD 2015.
 
 NOTA: Os arquivos neste repositório contêm apenas amostras representativas.
-Para o dataset completo (3000 frases), baixe diretamente do UCI Repository.
+Para o dataset completo (aproximadamente 3000 frases), baixe diretamente do UCI Repository.
